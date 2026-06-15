@@ -243,10 +243,10 @@ async function renderMap() {
     mapChart = echarts.init(document.getElementById('map-container'), 'dark');
   }
 
-  // Load China JSON
+  // Load China JSON from local file
   let chinaJson;
   try {
-    const resp = await fetch('https://geo.datav.aliyun.com/areas_v3/bound/100000_full.json');
+    const resp = await fetch('china.json');
     chinaJson = await resp.json();
   } catch (e) {
     document.getElementById('map-container').innerHTML =
