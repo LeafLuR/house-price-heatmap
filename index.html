@@ -202,20 +202,11 @@ tr:hover { background: #152545; }
   <label>类型：</label>
   <button class="active" id="btn-new" onclick="switchType('new_house')">🏗️ 新房</button>
   <button id="btn-second" onclick="switchType('second_hand')">🏠 二手房</button>
-  <label style="margin-left:8px;">指标：</label>
+  <label style="margin-left:8px;">维度：</label>
   <button class="active" id="btn-hb" onclick="switchMetric('环比')" title="环比 = 跟上个月比">环比</button>
   <button id="btn-tb" onclick="switchMetric('同比')" title="同比 = 跟去年同月比">同比</button>
   <button id="btn-dj" onclick="switchMetric('定基')" title="定基 = 跟2020年基准比">定基</button>
 
-  <label style="margin-left:8px;">城市：</label>
-  <select id="city-select" onchange="onCityChange()" style="width:100px;">
-    <option value="all">全部城市</option>
-    <option value="杭州" selected>⭐ 杭州</option>
-    <option value="大连">⭐ 大连</option>
-    <option value="昆明">⭐ 昆明</option>
-    <option value="哈尔滨">⭐ 哈尔滨</option>
-  </select>
-  
   <div class="time-slider-container">
     <span class="time-label" id="time-label">2021-07</span>
     <input type="range" id="time-slider" min="0" max="0" value="0" oninput="onTimeChange()">
@@ -253,7 +244,15 @@ tr:hover { background: #152545; }
       <div id="map-container" style="width:100%;height:calc(100% - 36px);min-height:340px;"><div class="loading-state">⏳ 加载中...</div></div>
     </div>
     <div class="panel" id="trend-panel">
-      <div class="panel-title">📈 累积价格指数 <span class="badge">以2015年1月=1.0为基准 · 环比连乘</span></div>
+      <div class="panel-title" onmouseover="showTip(event,'<strong>累积价格指数怎么算的？</strong><br><br>🔢 <strong>公式</strong>:<br>2011年1月 = <strong>1.0</strong>（起点）<br>下个月 = 1.0 × (本月环比÷100)<br>再下个月 = 上个月结果 × (本月环比÷100)<br><br>📖 <strong>举例</strong>:<br>杭州 2011-01 = <strong>1.000</strong><br>环比 100.4 → ×1.004 = <strong>1.004</strong><br>环比 100.5 → ×1.005 = <strong>1.009</strong><br>14年后 → 累积 <strong>1.35</strong>（涨了35%）<br><br>📉 如果 <strong>小于1.0</strong> = 比2011年跌了<br>📈 如果 <strong>大于1.0</strong> = 比2011年涨了')" onmouseout="hideTip()">📈 累积价格指数 <span class="badge">起点1.0 → 每月×环比÷100</span></div>
+      <div style="padding:4px 16px 8px;font-size:12px;color:#6a8aaa;border-bottom:1px solid #1a3050;">
+        <span>🔍 城市选择：</span>
+        <label style="margin-left:8px;cursor:pointer;"><input type="checkbox" class="city-chk" value="杭州" checked onchange="onCityCheck()"> <span style="color:#fbbf24">杭州</span></label>
+        <label style="margin-left:8px;cursor:pointer;"><input type="checkbox" class="city-chk" value="大连" checked onchange="onCityCheck()"> <span style="color:#22c55e">大连</span></label>
+        <label style="margin-left:8px;cursor:pointer;"><input type="checkbox" class="city-chk" value="哈尔滨" checked onchange="onCityCheck()"> <span style="color:#ef4444">哈尔滨</span></label>
+        <label style="margin-left:8px;cursor:pointer;"><input type="checkbox" class="city-chk" value="厦门" checked onchange="onCityCheck()"> <span style="color:#3b82f6">厦门</span></label>
+        <span style="margin-left:12px;color:#4a6a8a;font-size:11px;">勾选城市 → 折线图显示</span>
+      </div>
       <div id="trend-container" style="width:100%;height:calc(100% - 36px);"></div>
     </div>
   </div>
@@ -284,7 +283,7 @@ tr:hover { background: #152545; }
 
 <script>
 // ========== CONSTANTS ==========
-const FOCUS = ['杭州', '大连', '昆明', '哈尔滨'];
+const FOCUS = ['杭州', '大连', '哈尔滨', '厦门'];
 const CITY_COORDS = {
   北京:[116.407,39.904],天津:[117.190,39.125],石家庄:[114.514,38.042],唐山:[118.180,39.630],
   秦皇岛:[119.600,39.935],包头:[109.840,40.657],太原:[112.549,37.857],呼和浩特:[111.751,40.842],
@@ -429,7 +428,7 @@ function renderMap() {
   const range = maxVal - minVal || 1;
   
   const focusSet = new Set(FOCUS);
-  const selCity = getSelectedCity();
+  const selCities = getSelectedCities();
   
   const option = {
     backgroundColor: 'transparent',
@@ -465,7 +464,7 @@ function renderMap() {
       data: scatterData.filter(d => focusSet.has(d.name)).map(d => ({
         ...d, itemStyle: { color: '#fbbf24' }
       })),
-      symbolSize: selCity === 'all' ? 24 : (FOCUS.includes(selCity) ? 24 : 10),
+      symbolSize: selCities.length > 0 ? 24 : 10,
       rippleEffect: { brushType: 'stroke', period: 4, scale: 3 },
       label: { show: true, formatter: '{b}', position: 'right', color: '#fbbf24', fontSize: 11, fontWeight: 'bold' }
     }]
@@ -474,8 +473,8 @@ function renderMap() {
   mapChart.setOption(option, true);
 }
 
-// ========== TREND CHART (累积价格指数: 2015年=1.0) ==========
-// 用环比逐月连乘，算出以2015年为基准1.0的累积价格指数
+// ========== TREND CHART (累积价格指数: 2011年1月=1.0) ==========
+// 用环比逐月连乘，算出以2011年1月为基准1.0的累积价格指数
 // 比如：这个月涨1%→×1.01，下个月再涨1%→再×1.01=1.0201
 function computeCumulativeIndex(city) {
   const trend = data.city_trends[city];
@@ -490,42 +489,64 @@ function computeCumulativeIndex(city) {
     if (p.value) hbMap[p.month] = p.value;
   }
   
-  // Find the index of 2015-01 in months array
-  const baseMonth = '2015-01';
+  // Find the index of 2011-01 in months array (数据起点)
+  const baseMonth = '2011-01';
   const baseIdx = months.indexOf(baseMonth);
-  if (baseIdx < 0) return null;  // 没有2015年数据
+  if (baseIdx < 0) return null;  // 没有2011年数据
   
   // Compute cumulative index
   const result = new Array(months.length).fill(null);
   
-  // Set 2015-01 as base (= 1.0)
+  // Set 2011-01 as base (= 1.0)
   result[baseIdx] = 1.0;
   
-  // Forward: months after 2015-01
+  // Forward: months after 2011-01
   for (let i = baseIdx + 1; i < months.length; i++) {
     const hb = hbMap[months[i]];  // 这个月的环比 = 跟上个月比
-    if (hb && result[i-1] !== null) {
-      result[i] = result[i-1] * (hb / 100);
+    if (result[i-1] !== null) {
+      if (hb) {
+        result[i] = result[i-1] * (hb / 100);
+      } else {
+        // 数据缺失：用上个月的值续上（折线保持不断）
+        result[i] = result[i-1];
+      }
     }
   }
   
-  // Backward: months before 2015-01
+  // Backward: months before 2011-01
   for (let i = baseIdx; i > 0; i--) {
     const hb = hbMap[months[i]];  // 这个月的环比 = 跟上个月比
-    // 要算上个月的累积，需要"上个月的环比"实际上就是当前月的环比描述的"相对于上个月"
-    // month[i]的环比是相对于month[i-1]，所以 result[i-1] = result[i] / (hb/100)
-    if (hb && result[i] !== null) {
-      result[i-1] = result[i] / (hb / 100);
+    // 要算上个月的累积：month[i]的环比是相对于month[i-1]
+    // result[i-1] = result[i] / (hb/100)
+    if (result[i] !== null) {
+      if (hb) {
+        result[i-1] = result[i] / (hb / 100);
+      } else {
+        // 数据缺失：用这个月的值续上
+        result[i-1] = result[i];
+      }
     }
   }
   
   return result;
 }
 
+function getSelectedCities() {
+  const checks = document.querySelectorAll('.city-chk:checked');
+  return Array.from(checks).map(cb => cb.value);
+}
+
+function onCityCheck() {
+  renderTrend();
+  renderMap();
+}
+
 function renderTrend() {
-  // Show all focus cities + selected city
-  const selCity = getSelectedCity();
-  const allCities = [...new Set([...FOCUS, ...(selCity !== 'all' ? [selCity] : [])])];
+  const allCities = getSelectedCities();
+  if (allCities.length === 0) {
+    trendChart.setOption({series: []}, true);
+    return;
+  }
   
   const series = allCities.map(city => {
     const cumIndex = computeCumulativeIndex(city);
@@ -543,7 +564,7 @@ function renderTrend() {
     };
   }).filter(Boolean);
   
-  const colors = { '杭州': '#fbbf24', '大连': '#22c55e', '昆明': '#3b82f6', '哈尔滨': '#ef4444' };
+  const colors = { '杭州': '#fbbf24', '大连': '#22c55e', '哈尔滨': '#ef4444', '厦门': '#3b82f6' };
   const colorList = ['#fbbf24', '#22c55e', '#3b82f6', '#ef4444', '#a78bfa', '#f472b6'];
   series.forEach((s, i) => { 
     s.itemStyle = { color: colors[s.name] || colorList[i % colorList.length] }; 
@@ -559,7 +580,7 @@ function renderTrend() {
       formatter: params => {
         const idx = params[0].dataIndex;
         let html = `<strong>${months[idx]}</strong><br/>
-          <span style="color:#5a7a9a;font-size:11px">2015年1月 = 1.0（基准）</span><br/>`;
+          <span style="color:#5a7a9a;font-size:11px">2011年1月 = 1.0（数据起点）</span><br/>`;
         params.sort((a, b) => b.data - a.data);
         params.forEach(p => {
           const v = p.data;
@@ -604,7 +625,7 @@ function renderTrend() {
         symbol: 'none',
         data: [
           { yAxis: 1.0, label: { formatter: '基准 1.0', color: '#4a6a8a', fontSize: 10, position: 'insideEndTop' }, lineStyle: { color: '#4a6a8a', type: 'dashed', width: 1 } },
-          ...(baseIdx >= 0 ? [{ xAxis: baseIdx, label: { formatter: '2015→', color: '#4fc3f7', fontSize: 11, position: 'start' }, lineStyle: { color: '#4fc3f7', type: 'dashed', width: 1 } }] : [])
+          ...(baseIdx >= 0 ? [{ xAxis: baseIdx, label: { formatter: '2011→', color: '#4fc3f7', fontSize: 11, position: 'start' }, lineStyle: { color: '#4fc3f7', type: 'dashed', width: 1 } }] : [])
         ]
       } : undefined
     }))
