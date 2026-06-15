@@ -82,29 +82,13 @@ a:hover { text-decoration: underline; }
 .play-btn:hover { background: #1976d2; }
 
 /* ====== KPI Cards ====== */
-.kpi-row {
-  display: grid; grid-template-columns: repeat(4, 1fr);
-  gap: 12px; padding: 12px 24px;
-}
-.kpi-card {
-  background: linear-gradient(135deg, #0d1a2e, #152545);
-  border: 1px solid #1a3050; border-radius: 10px;
-  padding: 14px 16px; text-align: center;
-}
-.kpi-card .kpi-label { color: #5a7a9a; font-size: 12px; cursor: help; }
-.kpi-card .kpi-value { font-size: 24px; font-weight: 700; margin-top: 4px; }
-.kpi-card .kpi-change { font-size: 12px; margin-top: 2px; }
-.kpi-focus { 
-  background: linear-gradient(135deg, #1a2a1e, #152a1e);
-  border-color: #2a5a3a;
-}
 .up { color: #ef4444; }
 .down { color: #22c55e; }
 .flat { color: #6a8aaa; }
 
 /* ====== Main Layout ====== */
 .main-grid {
-  display: grid; grid-template-columns: 1fr 380px;
+  display: grid; grid-template-columns: 2fr 1fr;
   gap: 12px; padding: 0 24px 12px;
 }
 .left-col { display: flex; flex-direction: column; gap: 12px; }
@@ -126,7 +110,6 @@ a:hover { text-decoration: underline; }
 
 #map-panel { flex: 1; min-height: 380px; }
 #trend-panel { height: 300px; }
-#rank-panel { min-height: 340px; height: 340px; }
 #table-panel { flex: 1; min-height: 260px; }
 
 /* ====== Focus Cities ====== */
@@ -178,7 +161,6 @@ tr:hover { background: #152545; }
 /* ====== Responsive ====== */
 @media (max-width: 900px) {
   .main-grid { grid-template-columns: 1fr; }
-  .kpi-row { grid-template-columns: repeat(2, 1fr); }
   .focus-grid { grid-template-columns: repeat(2, 1fr); }
   .header h1 { font-size: 16px; }
 }
@@ -217,29 +199,6 @@ tr:hover { background: #152545; }
   </div>
 </div>
 
-<div class="kpi-row" id="kpi-row">
-  <div class="kpi-card" id="kpi-card-up" style="cursor:pointer;" onclick="toggleMapFilter('up')">
-    <div class="kpi-label" onmouseover="showTip(event,'点击切换：只显示上涨城市')" onmouseout="hideTip()">📈 上涨城市数</div>
-    <div class="kpi-value up" id="kpi-up">-</div>
-    <div class="kpi-change" id="kpi-up-change">点击筛选</div>
-  </div>
-  <div class="kpi-card" id="kpi-card-down" style="cursor:pointer;" onclick="toggleMapFilter('down')">
-    <div class="kpi-label" onmouseover="showTip(event,'点击切换：只显示下跌城市')" onmouseout="hideTip()">📉 下跌城市数</div>
-    <div class="kpi-value down" id="kpi-down">-</div>
-    <div class="kpi-change" id="kpi-down-change">点击筛选</div>
-  </div>
-  <div class="kpi-card">
-    <div class="kpi-label" onmouseover="showTip(event,'全部70城的价格变化平均值<br>&gt;100 = 整体上涨，&lt;100 = 整体下跌')" onmouseout="hideTip()">📊 70城平均</div>
-    <div class="kpi-value" id="kpi-avg">-</div>
-    <div class="kpi-change" id="kpi-avg-change">-</div>
-  </div>
-  <div class="kpi-card kpi-focus">
-    <div class="kpi-label" onmouseover="showTip(event,'你关注的杭州在本月的表现')" onmouseout="hideTip()">⭐ 杭州</div>
-    <div class="kpi-value" id="kpi-hz">-</div>
-    <div class="kpi-change" id="kpi-hz-change"></div>
-  </div>
-</div>
-
 <div class="main-grid">
   <div class="left-col">
     <div class="panel" id="map-panel">
@@ -249,6 +208,7 @@ tr:hover { background: #152545; }
         <button class="mf-btn active" id="mf-all" onclick="setMapFilter('all')" style="padding:2px 10px;border-radius:10px;border:1px solid #1a3050;background:transparent;color:#c0d0e0;cursor:pointer;">全部</button>
         <button class="mf-btn" id="mf-up" onclick="setMapFilter('up')" style="padding:2px 10px;border-radius:10px;border:1px solid #1a3050;background:transparent;color:#ef4444;cursor:pointer;">⬆ 上涨</button>
         <button class="mf-btn" id="mf-down" onclick="setMapFilter('down')" style="padding:2px 10px;border-radius:10px;border:1px solid #1a3050;background:transparent;color:#22c55e;cursor:pointer;">⬇ 下跌</button>
+        <span id="map-count" style="color:#4a6a8a;font-size:11px;"></span>
         <span style="flex:1;"></span>
         <button onclick="resetMapView()" style="padding:2px 8px;border-radius:10px;border:1px solid #1a3050;background:transparent;color:#6a8aaa;cursor:pointer;" title="重置缩放">⟲</button>
         <button onclick="zoomMapBy(0.7)" style="padding:2px 8px;border-radius:10px;border:1px solid #1a3050;background:transparent;color:#6a8aaa;cursor:pointer;font-size:14px;" title="缩小">−</button>
@@ -272,11 +232,7 @@ tr:hover { background: #152545; }
     </div>
   </div>
   <div class="right-col">
-    <div class="panel" id="rank-panel">
-      <div class="panel-title">🏆 当月涨跌榜 <span class="badge" id="rank-badge">前5涨 · 后5跌</span></div>
-      <div id="rank-container" style="width:100%;height:calc(100% - 36px);"></div>
-    </div>
-    <div class="panel" id="table-panel">
+    <div class="panel" id="table-panel" style="flex:1;">
       <div class="panel-title">📋 全部城市数据 <span class="badge" id="table-badge">70城</span></div>
       <div class="table-wrap" id="data-table-wrap">
         <table>
@@ -328,7 +284,7 @@ let currentMonthIdx = 0;
 let months = [];
 let isPlaying = false;
 let playTimer = null;
-let mapChart = null, trendChart = null, rankChart = null;
+let mapChart = null, trendChart = null;
 
 // ========== LOAD ==========
 async function loadData() {
@@ -372,12 +328,10 @@ async function initCharts() {
   
   mapChart = echarts.init(document.getElementById('map-container'), 'dark');
   trendChart = echarts.init(document.getElementById('trend-container'), 'dark');
-  rankChart = echarts.init(document.getElementById('rank-container'), 'dark');
   
   window.addEventListener('resize', () => {
     mapChart?.resize();
     trendChart?.resize();
-    rankChart?.resize();
   });
   
   updateAll();
@@ -398,8 +352,8 @@ function getMonthData(type, metric) {
   }));
 }
 
+// removed
 function getSelectedCity() {
-  return document.getElementById('city-select').value;
 }
 
 // ========== UPDATE ALL ==========
@@ -410,15 +364,12 @@ function updateAll() {
   
   const badgeText = m.period || key;
   document.getElementById('map-badge').textContent = badgeText;
-  document.getElementById('rank-badge').textContent = badgeText;
   document.getElementById('table-badge').textContent = `${(m.new_house?.length || 0)}城`;
   document.getElementById('time-label').textContent = key;
   
   renderMap();
   renderTrend();
-  renderRank();
   renderTable();
-  updateKPI();
 }
 
 // ========== CITY MAP (省份底色 + 城市色块) ==========
@@ -492,6 +443,13 @@ function colorFor(val) {
 
 function renderMap() {
   var entries = getMonthData(currentType, currentMetric);
+  var allEntries = entries;
+  
+  // Update count display
+  var upCount = allEntries.filter(function(e) { return e.metric > 100; }).length;
+  var downCount = allEntries.filter(function(e) { return e.metric < 100; }).length;
+  var countEl = document.getElementById('map-count');
+  if (countEl) countEl.innerHTML = '<span style="color:#ef4444;">⬆ ' + upCount + '</span> <span style="color:#4a6a8a;">/</span> <span style="color:#22c55e;">⬇ ' + downCount + '</span>';
   
   // Apply filter
   if (mapFilter === 'up') {
@@ -815,52 +773,6 @@ function renderTrend() {
   trendChart.setOption(option, true);
 }
 
-// ========== RANK CHART ==========
-function renderRank() {
-  const entries = getMonthData(currentType, currentMetric);
-  const sorted = [...entries].sort((a, b) => b.metric - a.metric);
-  const top5 = sorted.slice(0, 5);
-  const bottom5 = sorted.slice(-5).reverse();
-  const rankData = [...top5, ...bottom5];
-  const names = rankData.map(d => d.city);
-  const vals = rankData.map(d => +(d.metric - 100).toFixed(1));
-  const colors = vals.map(v => v >= 0 ? '#ef4444' : '#22c55e');
-  
-  const option = {
-    backgroundColor: 'transparent',
-    tooltip: {
-      trigger: 'axis', axisPointer: { type: 'shadow' },
-      formatter: params => {
-        const p = params[0];
-        return `<strong>${p.name}</strong><br/>${p.seriesName}: ${p.value > 0 ? '+' + p.value : p.value}%<br/><span style="color:#5a7a9a;font-size:11px">正数=涨 负数=跌</span>`;
-      },
-      backgroundColor: 'rgba(10,14,23,0.9)', borderColor: '#1a3050',
-      textStyle: { color: '#e1e8ed', fontSize: 12 }
-    },
-    grid: { left: 75, right: 80, top: 10, bottom: 15 },
-    xAxis: {
-      type: 'value',
-      axisLabel: { formatter: v => v + '%', color: '#4a6a8a', fontSize: 9 },
-      splitLine: { lineStyle: { color: '#111e30' } }
-    },
-    yAxis: {
-      type: 'category',
-      data: names,
-      axisLabel: { color: '#c0d0e0', fontSize: 11, width: 70, overflow: 'truncate' },
-      axisLine: { show: false },
-      axisTick: { show: false }
-    },
-    series: [{
-      type: 'bar',
-      data: vals.map((v, i) => ({ value: v, itemStyle: { color: colors[i], borderRadius: [0, 4, 4, 0] } })),
-      barWidth: 12,
-      label: { show: true, position: 'right', formatter: p => (p.value > 0 ? '+' : '') + p.value + '%', color: '#c0d0e0', fontSize: 10, width: 60, overflow: 'truncate' }
-    }]
-  };
-  
-  rankChart.setOption(option, true);
-}
-
 // ========== TABLE ==========
 function renderTable() {
   const entries = getMonthData(currentType, currentMetric);
@@ -879,32 +791,6 @@ function renderTable() {
       <td class="${djCls}" title="比2020年基准: ${dj > 100 ? '+':''}${(dj - 100).toFixed(1)}%">${(dj - 100).toFixed(1)}%</td>
     </tr>`;
   }).join('');
-}
-
-// ========== KPI ==========
-function updateKPI() {
-  const entries = getMonthData(currentType, currentMetric);
-  const up = entries.filter(d => d.metric > 100).length;
-  const down = entries.filter(d => d.metric < 100).length;
-  const avg = entries.reduce((s, d) => s + d.metric, 0) / entries.length;
-  const avgDiff = avg - 100;
-  
-  document.getElementById('kpi-up').textContent = up;
-  document.getElementById('kpi-up').className = `kpi-value ${up > 35 ? 'up' : 'down'}`;
-  document.getElementById('kpi-down').textContent = down;
-  
-  document.getElementById('kpi-avg').innerHTML = avgDiff > 0 ? `+${avgDiff.toFixed(2)}%` : `${avgDiff.toFixed(2)}%`;
-  document.getElementById('kpi-avg').className = avgDiff > 0 ? 'kpi-value up' : avgDiff < 0 ? 'kpi-value down' : 'kpi-value flat';
-  document.getElementById('kpi-avg-change').textContent = `70城平均${currentMetric === '环比' ? '月涨跌' : currentMetric === '同比' ? '年涨跌' : '累计涨跌'}`;
-  
-  const hz = entries.find(d => d.city === '杭州');
-  if (hz) {
-    const hzV = hz.metric - 100;
-    document.getElementById('kpi-hz').textContent = hzV > 0 ? `+${hzV.toFixed(1)}%` : `${hzV.toFixed(1)}%`;
-    document.getElementById('kpi-hz').className = hzV > 0 ? 'kpi-value up' : 'kpi-value down';
-    document.getElementById('kpi-hz-change').textContent = 
-      `杭州 ${currentMetric === '环比' ? '月涨跌' : currentMetric === '同比' ? '年涨跌' : '累计涨跌'}`;
-  }
 }
 
 // ========== SLIDER & PLAY ==========
