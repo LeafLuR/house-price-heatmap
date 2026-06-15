@@ -253,7 +253,7 @@ tr:hover { background: #152545; }
       <div id="map-container" style="width:100%;height:calc(100% - 36px);min-height:340px;"><div class="loading-state">⏳ 加载中...</div></div>
     </div>
     <div class="panel" id="trend-panel">
-      <div class="panel-title">📈 房价趋势折线图 <span class="badge">把鼠标悬停线上看数据 · 点击图例显示/隐藏城市</span></div>
+      <div class="panel-title">📈 累积价格指数 <span class="badge">以2015年1月=1.0为基准 · 环比连乘</span></div>
       <div id="trend-container" style="width:100%;height:calc(100% - 36px);"></div>
     </div>
   </div>
@@ -474,32 +474,69 @@ function renderMap() {
   mapChart.setOption(option, true);
 }
 
-// ========== TREND CHART (折线图 - 最直观看房价趋势) ==========
+// ========== TREND CHART (累积价格指数: 2015年=1.0) ==========
+// 用环比逐月连乘，算出以2015年为基准1.0的累积价格指数
+// 比如：这个月涨1%→×1.01，下个月再涨1%→再×1.01=1.0201
+function computeCumulativeIndex(city) {
+  const trend = data.city_trends[city];
+  if (!trend) return null;
+  const key = currentType === 'new_house' ? '新房' : '二手';
+  const metricKey = `${key}环比`;  // 用环比连乘
+  const points = trend[metricKey] || [];
+  
+  // Build map: month → 环比值
+  const hbMap = {};
+  for (const p of points) {
+    if (p.value) hbMap[p.month] = p.value;
+  }
+  
+  // Find the index of 2015-01 in months array
+  const baseMonth = '2015-01';
+  const baseIdx = months.indexOf(baseMonth);
+  if (baseIdx < 0) return null;  // 没有2015年数据
+  
+  // Compute cumulative index
+  const result = new Array(months.length).fill(null);
+  
+  // Set 2015-01 as base (= 1.0)
+  result[baseIdx] = 1.0;
+  
+  // Forward: months after 2015-01
+  for (let i = baseIdx + 1; i < months.length; i++) {
+    const hb = hbMap[months[i]];  // 这个月的环比 = 跟上个月比
+    if (hb && result[i-1] !== null) {
+      result[i] = result[i-1] * (hb / 100);
+    }
+  }
+  
+  // Backward: months before 2015-01
+  for (let i = baseIdx; i > 0; i--) {
+    const hb = hbMap[months[i]];  // 这个月的环比 = 跟上个月比
+    // 要算上个月的累积，需要"上个月的环比"实际上就是当前月的环比描述的"相对于上个月"
+    // month[i]的环比是相对于month[i-1]，所以 result[i-1] = result[i] / (hb/100)
+    if (hb && result[i] !== null) {
+      result[i-1] = result[i] / (hb / 100);
+    }
+  }
+  
+  return result;
+}
+
 function renderTrend() {
   // Show all focus cities + selected city
-  const citiesToShow = FOCUS;
   const selCity = getSelectedCity();
   const allCities = [...new Set([...FOCUS, ...(selCity !== 'all' ? [selCity] : [])])];
   
   const series = allCities.map(city => {
-    const trend = data.city_trends[city];
-    if (!trend) return null;
-    const key = currentType === 'new_house' ? '新房' : '二手';
-    const metricKey = `${key}${currentMetric}`;
-    const points = trend[metricKey] || [];
-    
-    // Build full time series aligned with months
-    const values = months.map(m => {
-      const p = points.find(pt => pt.month === m);
-      return p && p.value ? +(p.value - 100).toFixed(1) : null;
-    });
+    const cumIndex = computeCumulativeIndex(city);
+    if (!cumIndex) return null;
     
     return {
       name: city,
       type: 'line',
       smooth: true,
       symbol: 'circle', symbolSize: 4,
-      data: values,
+      data: cumIndex,
       lineStyle: { width: 2.5 },
       areaStyle: { opacity: 0.05 },
       emphasis: { focus: 'series' }
@@ -512,33 +549,26 @@ function renderTrend() {
     s.itemStyle = { color: colors[s.name] || colorList[i % colorList.length] }; 
   });
   
-  // Mark current month with a vertical line
-  const markLine = {
-    silent: true,
-    data: [{ xAxis: currentMonthIdx, label: { formatter: `← ${months[currentMonthIdx]}`, color: '#4fc3f7', fontSize: 11 }, lineStyle: { color: '#4fc3f7', type: 'dashed', width: 1 } }]
-  };
-  
-  // Reference line at 100 (涨跌分界线)
-  const markLine100 = {
-    silent: true,
-    data: [{ yAxis: 0, label: { formatter: '持平线', color: '#6a8aaa', fontSize: 10, position: 'insideEndTop' }, lineStyle: { color: '#4a6a8a', type: 'dashed', width: 1 } }]
-  };
+  // Mark 2015 base with a dashed line
+  const baseIdx = months.indexOf('2015-01');
   
   const option = {
     backgroundColor: 'transparent',
     tooltip: {
       trigger: 'axis',
       formatter: params => {
-        let html = `<strong>${months[params[0].dataIndex]}</strong><br/>`;
+        const idx = params[0].dataIndex;
+        let html = `<strong>${months[idx]}</strong><br/>
+          <span style="color:#5a7a9a;font-size:11px">2015年1月 = 1.0（基准）</span><br/>`;
         params.sort((a, b) => b.data - a.data);
         params.forEach(p => {
           const v = p.data;
           if (v === null) return;
-          const arrow = v > 0 ? '↑' : v < 0 ? '↓' : '→';
-          const cls = v > 0 ? 'up' : v < 0 ? 'down' : 'flat';
-          html += `<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${p.color};margin-right:4px"></span>${p.seriesName}: <strong>${arrow} ${v > 0 ? '+' : ''}${v}%</strong><br/>`;
+          const arrow = v > 1.0 ? '↑' : v < 1.0 ? '↓' : '→';
+          const pct = ((v - 1.0) * 100).toFixed(1);
+          html += `<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${p.color};margin-right:4px"></span>${p.seriesName}: <strong>${arrow} ${pct > 0 ? '+' : ''}${pct}%</strong><br/>`;
         });
-        html += `<span style="color:#5a7a9a;font-size:11px">线上涨=房价涨，线下跌=房价跌</span>`;
+        html += `<span style="color:#5a7a9a;font-size:11px">数值=累积涨跌幅（2015年1月基准=1）</span>`;
         return html;
       },
       backgroundColor: 'rgba(10,14,23,0.9)', borderColor: '#1a3050',
@@ -550,39 +580,35 @@ function renderTrend() {
       bottom: 0,
       selector: [{ type: 'all', title: '全部' }, { type: 'inverse', title: '反选' }]
     },
-    grid: { left: 50, right: 20, top: 20, bottom: 35 },
+    grid: { left: 55, right: 25, top: 20, bottom: 35 },
     xAxis: {
       type: 'category',
       data: months.map(m => m.slice(5)),
-      axisLabel: { color: '#4a6a8a', fontSize: 9, interval: 5 },
+      axisLabel: { color: '#4a6a8a', fontSize: 9, interval: 11 },
       axisLine: { lineStyle: { color: '#1a3050' } },
       splitLine: { show: false }
     },
     yAxis: {
       type: 'value',
-      axisLabel: { formatter: v => (v > 0 ? '+' : '') + v + '%', color: '#4a6a8a', fontSize: 10 },
+      axisLabel: { formatter: v => v.toFixed(2), color: '#4a6a8a', fontSize: 10 },
       axisLine: { show: false },
       splitLine: { lineStyle: { color: '#111e30' } },
-      scale: true
+      scale: true,
+      min: 'dataMin',
+      max: 'dataMax'
     },
-    series: series.map(s => ({
+    series: series.map((s, i) => ({
       ...s,
-      markLine: s.name === allCities[0] ? markLine : undefined,
-      markLine100: undefined
+      markLine: i === 0 ? {
+        silent: true,
+        symbol: 'none',
+        data: [
+          { yAxis: 1.0, label: { formatter: '基准 1.0', color: '#4a6a8a', fontSize: 10, position: 'insideEndTop' }, lineStyle: { color: '#4a6a8a', type: 'dashed', width: 1 } },
+          ...(baseIdx >= 0 ? [{ xAxis: baseIdx, label: { formatter: '2015→', color: '#4fc3f7', fontSize: 11, position: 'start' }, lineStyle: { color: '#4fc3f7', type: 'dashed', width: 1 } }] : [])
+        ]
+      } : undefined
     }))
   };
-  
-  // Add horizontal 0% reference line to first series
-  if (series.length > 0) {
-    series[0].markLine = {
-      silent: true,
-      symbol: 'none',
-      data: [
-        { yAxis: 0, label: { formatter: '', color: '#4a6a8a', fontSize: 10 }, lineStyle: { color: '#4a6a8a', type: 'dashed', width: 1 } },
-        { xAxis: currentMonthIdx, label: { formatter: `← ${months[currentMonthIdx]}`, color: '#4fc3f7', fontSize: 11, position: 'end' }, lineStyle: { color: '#4fc3f7', type: 'dashed', width: 1 } }
-      ]
-    };
-  }
   
   trendChart.setOption(option, true);
 }
@@ -609,7 +635,7 @@ function renderRank() {
       backgroundColor: 'rgba(10,14,23,0.9)', borderColor: '#1a3050',
       textStyle: { color: '#e1e8ed', fontSize: 12 }
     },
-    grid: { left: 15, right: 65, top: 10, bottom: 10 },
+    grid: { left: 75, right: 80, top: 10, bottom: 15 },
     xAxis: {
       type: 'value',
       axisLabel: { formatter: v => v + '%', color: '#4a6a8a', fontSize: 9 },
@@ -618,7 +644,7 @@ function renderRank() {
     yAxis: {
       type: 'category',
       data: names,
-      axisLabel: { color: '#c0d0e0', fontSize: 11 },
+      axisLabel: { color: '#c0d0e0', fontSize: 11, width: 70, overflow: 'truncate' },
       axisLine: { show: false },
       axisTick: { show: false }
     },
