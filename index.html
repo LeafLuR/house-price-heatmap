@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>70城房价热力图 - 国家统计局数据</title>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.6.0/dist/echarts.min.js"></script>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: #0f1419;
+  color: #e1e8ed;
+  min-height: 100vh;
+}
+.header {
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+  padding: 24px 20px;
+  text-align: center;
+  border-bottom: 1px solid #1e3050;
+}
+.header h1 { font-size: 24px; color: #fff; margin-bottom: 6px; letter-spacing: 2px; }
+.header .subtitle { color: #8ab4f8; font-size: 14px; }
+.header .period { color: #6b7280; font-size: 13px; margin-top: 4px; }
+.controls {
+  display: flex; gap: 12px; justify-content: center;
+  padding: 16px; flex-wrap: wrap;
+  background: #1a1a2e; border-bottom: 1px solid #1e3050;
+}
+.btn {
+  padding: 8px 20px; border: 1px solid #2a3a5c; border-radius: 20px;
+  background: transparent; color: #8ab4f8; cursor: pointer;
+  font-size: 14px; transition: all 0.2s;
+}
+.btn:hover { background: #1e3050; }
+.btn.active { background: #1e88e5; color: #fff; border-color: #1e88e5; }
+.btn-key {
+  padding: 4px 12px; border-radius: 12px; font-size: 12px;
+  background: #1a3a5c; color: #fbbf24; border: 1px solid #fbbf24;
+}
+.key-cities-bar {
+  display: flex; gap: 20px; justify-content: center; padding: 12px 20px;
+  background: #0d1b2a; flex-wrap: wrap;
+}
+.key-city {
+  text-align: center; min-width: 100px; padding: 8px;
+  border-radius: 10px; background: #1a1a2e;
+  border: 1px solid #1e3050;
+}
+.key-city .name { font-size: 15px; font-weight: 600; color: #fbbf24; }
+.key-city .hb { font-size: 18px; font-weight: 700; margin-top: 4px; }
+.key-city .tb { font-size: 12px; color: #6b7280; }
+.key-city .label { font-size: 11px; color: #6b7280; }
+.up { color: #22c55e; }
+.down { color: #ef4444; }
+.flat { color: #6b7280; }
+#map-container { width: 100%; height: 600px; }
+.chart-section { padding: 0; }
+.legend-bar {
+  display: flex; justify-content: center; align-items: center;
+  gap: 8px; padding: 10px; background: #1a1a2e;
+  font-size: 12px; color: #6b7280;
+}
+.gradient-bar {
+  width: 200px; height: 12px;
+  background: linear-gradient(to right, #3b82f6, #22c55e, #fbbf24, #ef4444);
+  border-radius: 6px;
+}
+.data-table-container {
+  padding: 20px; overflow-x: auto;
+  background: #0d1b2a;
+}
+.data-table-container h3 {
+  color: #8ab4f8; font-size: 16px; margin-bottom: 12px;
+}
+table {
+  width: 100%; border-collapse: collapse; font-size: 13px;
+}
+th {
+  background: #1a1a2e; color: #8ab4f8; padding: 8px 6px;
+  text-align: center; border-bottom: 2px solid #1e3050;
+  position: sticky; top: 0;
+}
+td {
+  padding: 6px; text-align: center; border-bottom: 1px solid #1a2a3c;
+}
+tr:hover { background: #1a2a3c; }
+td:first-child { text-align: left; font-weight: 500; }
+.highlight-row { background: #1a3a5c !important; }
+.highlight-row:hover { background: #1e4a6c !important; }
+.footer {
+  text-align: center; padding: 20px; color: #4a5568; font-size: 12px;
+  border-top: 1px solid #1e3050;
+}
+.footer a { color: #8ab4f8; text-decoration: none; }
+.loading {
+  display: flex; justify-content: center; align-items: center;
+  height: 400px; color: #6b7280; font-size: 16px;
+}
+@media (max-width: 768px) {
+  #map-container { height: 400px; }
+  .header h1 { font-size: 18px; }
+  .key-city { min-width: 70px; padding: 6px; }
+  .key-city .name { font-size: 13px; }
+  .key-city .hb { font-size: 15px; }
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>🏠 70城房价热力图</h1>
+  <div class="subtitle">国家统计局 · 新建商品住宅 / 二手住宅销售价格指数</div>
+  <div class="period" id="period-label">加载中...</div>
+</div>
+
+<div class="key-cities-bar" id="key-cities-bar"></div>
+
+<div class="controls">
+  <button class="btn active" id="btn-newhouse" onclick="switchData('new_house')">新建商品住宅</button>
+  <button class="btn" id="btn-secondhand" onclick="switchData('second_hand')">二手住宅</button>
+  <button class="btn active" id="btn-hb" onclick="switchMetric('环比')">环比 (月)</button>
+  <button class="btn" id="btn-tb" onclick="switchMetric('同比')">同比 (年)</button>
+</div>
+
+<div class="legend-bar">
+  <span>下跌</span>
+  <div class="gradient-bar"></div>
+  <span>上涨</span>
+  <span style="margin-left:16px; color:#8ab4f8;">圆圈大小 = 变化幅度</span>
+</div>
+
+<div class="chart-section">
+  <div id="map-container"><div class="loading">⏳ 加载地图数据中...</div></div>
+</div>
+
+<div class="data-table-container">
+  <h3>📊 完整城市数据 <span id="table-subtitle"></span></h3>
+  <div style="max-height:500px; overflow-y:auto;">
+    <table>
+      <thead><tr>
+        <th>城市</th><th>环比</th><th>同比</th><th>定基</th>
+      </tr></thead>
+      <tbody id="data-table-body"></tbody>
+    </table>
+  </div>
+</div>
+
+<div class="footer">
+  数据来源: <a href="https://www.stats.gov.cn" target="_blank">国家统计局</a> ·
+  <a href="https://github.com/LeafLuR/house-price-heatmap" target="_blank">GitHub</a> ·
+  自动更新每月中旬
+</div>
+
+<script>
+// ============ City coordinates ============
+const CITY_COORDS = {
+  北京: [116.407, 39.904], 天津: [117.190, 39.125],
+  石家庄: [114.514, 38.042], 唐山: [118.180, 39.630],
+  秦皇岛: [119.600, 39.935], 包头: [109.840, 40.657],
+  太原: [112.549, 37.857], 呼和浩特: [111.751, 40.842],
+  沈阳: [123.431, 41.806], 大连: [121.615, 38.914],
+  长春: [125.324, 43.886], 哈尔滨: [126.642, 45.756],
+  上海: [121.473, 31.230], 南京: [118.767, 32.041],
+  杭州: [120.155, 30.274], 宁波: [121.544, 29.868],
+  合肥: [117.283, 31.861], 福州: [119.296, 26.074],
+  厦门: [118.089, 24.479], 南昌: [115.857, 28.683],
+  济南: [117.120, 36.651], 青岛: [120.355, 36.083],
+  郑州: [113.665, 34.757], 武汉: [114.298, 30.584],
+  长沙: [112.979, 28.213], 广州: [113.264, 23.129],
+  深圳: [114.054, 22.521], 南宁: [108.366, 22.817],
+  海口: [110.330, 20.022], 重庆: [106.504, 29.533],
+  成都: [104.066, 30.573], 贵阳: [106.713, 26.578],
+  昆明: [102.712, 25.040], 西安: [108.940, 34.262],
+  兰州: [103.823, 36.058], 西宁: [101.779, 36.623],
+  银川: [106.271, 38.466], 乌鲁木齐: [87.617, 43.792],
+  丹东: [124.356, 40.000], 锦州: [121.130, 41.095],
+  吉林: [126.550, 43.838], 牡丹江: [129.608, 44.583],
+  无锡: [120.305, 31.570], 徐州: [117.188, 34.271],
+  扬州: [119.414, 32.394], 温州: [120.699, 27.994],
+  金华: [119.574, 29.105], 蚌埠: [117.389, 32.916],
+  安庆: [117.043, 30.506], 泉州: [118.589, 24.908],
+  九江: [115.952, 29.720], 赣州: [114.935, 25.831],
+  烟台: [121.391, 37.463], 济宁: [116.587, 35.415],
+  洛阳: [112.454, 34.620], 平顶山: [113.307, 33.735],
+  宜昌: [111.300, 30.728], 襄阳: [112.144, 32.042],
+  岳阳: [113.129, 29.366], 常德: [111.699, 29.031],
+  韶关: [113.596, 24.801], 湛江: [110.357, 21.270],
+  惠州: [114.410, 23.113], 桂林: [110.290, 25.276],
+  北海: [109.119, 21.475], 三亚: [109.508, 18.247],
+  泸州: [105.443, 28.889], 南充: [106.083, 30.795],
+  遵义: [106.927, 27.725], 大理: [100.224, 25.589]
+};
+
+// Focus cities
+const FOCUS_CITIES = ['杭州', '大连', '昆明', '哈尔滨'];
+
+let allData = null;
+let currentType = 'new_house';
+let currentMetric = '环比';
+
+// ============ Load data ============
+async function loadData() {
+  const resp = await fetch('data.json');
+  allData = await resp.json();
+  document.getElementById('period-label').textContent =
+    `📅 ${allData.period} · ${allData.publish_date} 发布`;
+  updateAll();
+}
+loadData();
+
+function updateAll() {
+  updateKeyCities();
+  renderMap();
+  renderTable();
+}
+
+// ============ Key cities highlight ============
+function updateKeyCities() {
+  const data = allData[currentType];
+  const bar = document.getElementById('key-cities-bar');
+  bar.innerHTML = FOCUS_CITIES.map(city => {
+    const c = data.find(d => d.city === city);
+    if (!c) return '';
+    const hb = parseFloat(c.环比);
+    const tb = parseFloat(c.同比);
+    const hbCls = hb > 100 ? 'up' : hb < 100 ? 'down' : 'flat';
+    const tbCls = tb > 100 ? 'up' : tb < 100 ? 'down' : 'flat';
+    return `<div class="key-city">
+      <div class="name">📍 ${city}</div>
+      <div class="${hbCls} hb">${hb > 100 ? '+' : ''}${(hb - 100).toFixed(1)}%</div>
+      <div class="tb ${tbCls}">同比: ${tb > 100 ? '+' : ''}${(tb - 100).toFixed(1)}%</div>
+      <div class="label">月环比</div>
+    </div>`;
+  }).join('');
+}
+
+// ============ Map rendering ============
+let mapChart = null;
+
+async function renderMap() {
+  if (!mapChart) {
+    mapChart = echarts.init(document.getElementById('map-container'), 'dark');
+  }
+
+  // Load China JSON
+  let chinaJson;
+  try {
+    const resp = await fetch('https://geo.datav.aliyun.com/areas_v3/bound/100000_full.json');
+    chinaJson = await resp.json();
+  } catch (e) {
+    document.getElementById('map-container').innerHTML =
+      '<div class="loading">❌ 地图数据加载失败，请刷新重试</div>';
+    return;
+  }
+
+  echarts.registerMap('china', chinaJson);
+  const data = allData[currentType];
+
+  // Build scatter data
+  const scatterData = data.map(d => {
+    const coord = CITY_COORDS[d.city];
+    if (!coord) return null;
+    const val = parseFloat(d[currentMetric]);
+    return {
+      name: d.city,
+      value: [...coord, val],
+      itemStyle: { color: getColor(val) }
+    };
+  }).filter(Boolean);
+
+  // Calculate bubble sizes
+  const vals = scatterData.map(d => d.value[2]);
+  const minVal = Math.min(...vals);
+  const maxVal = Math.max(...vals);
+  const range = maxVal - minVal || 1;
+
+  const option = {
+    backgroundColor: '#0f1419',
+    tooltip: {
+      trigger: 'item',
+      formatter: params => {
+        const d = data.find(c => c.city === params.name);
+        if (!d) return params.name;
+        const hb = parseFloat(d.环比);
+        const tb = parseFloat(d.同比);
+        return `<strong>${d.city}</strong><br/>
+          环比(月): ${hb > 100 ? '↑' : hb < 100 ? '↓' : '→'} ${(hb - 100).toFixed(1)}%<br/>
+          同比(年): ${tb > 100 ? '↑' : tb < 100 ? '↓' : '→'} ${(tb - 100).toFixed(1)}%<br/>
+          定基: ${d.定基}`;
+      },
+      backgroundColor: 'rgba(15,20,25,0.9)',
+      borderColor: '#1e3050',
+      textStyle: { color: '#e1e8ed', fontSize: 13 }
+    },
+    geo: {
+      map: 'china',
+      roam: true,
+      label: { show: false },
+      itemStyle: {
+        areaColor: '#1a2a3c',
+        borderColor: '#2a4a6c',
+        borderWidth: 0.5
+      },
+      emphasis: {
+        itemStyle: { areaColor: '#1e4a6c' }
+      }
+    },
+    series: [{
+      name: '房价指数',
+      type: 'scatter',
+      coordinateSystem: 'geo',
+      data: scatterData.map(d => ({
+        ...d,
+        symbolSize: Math.max(8, Math.min(30, 8 + (d.value[2] - minVal) / range * 22)),
+      })),
+      encode: { value: 2 },
+      label: {
+        show: false,
+        formatter: '{b}',
+        color: '#fff',
+        fontSize: 10
+      },
+      emphasis: {
+        scale: 1.5,
+        label: { show: true, fontSize: 13, fontWeight: 'bold' }
+      }
+    }, {
+      name: '重点关注',
+      type: 'effectScatter',
+      coordinateSystem: 'geo',
+      data: FOCUS_CITIES.map(city => {
+        const d = data.find(c => c.city === city);
+        if (!d) return null;
+        const coord = CITY_COORDS[city];
+        const val = parseFloat(d[currentMetric]);
+        return {
+          name: city,
+          value: [...coord, val],
+          itemStyle: { color: '#fbbf24' }
+        };
+      }).filter(Boolean),
+      symbolSize: 22,
+      rippleEffect: { brushType: 'stroke', period: 4, scale: 3 },
+      label: {
+        show: true,
+        formatter: '{b}',
+        position: 'right',
+        color: '#fbbf24',
+        fontSize: 12,
+        fontWeight: 'bold'
+      },
+      emphasis: { scale: 1.8 }
+    }]
+  };
+
+  mapChart.setOption(option);
+  mapChart.resize();
+}
+
+window.addEventListener('resize', () => mapChart?.resize());
+
+// ============ Color mapping ============
+function getColor(val) {
+  const diff = val - 100;
+  if (diff >= 2) return '#ef4444';    // hot red
+  if (diff >= 1) return '#f97316';    // orange
+  if (diff >= 0.3) return '#fbbf24';  // yellow
+  if (diff > -0.3) return '#6b7280';  // grey (flat)
+  if (diff > -1) return '#3b82f6';    // light blue
+  if (diff > -2) return '#2563eb';    // blue
+  return '#1d4ed8';                   // deep blue
+}
+
+// ============ Data table ============
+function renderTable() {
+  const data = allData[currentType];
+  const focused = new Set(FOCUS_CITIES);
+  const subtitle = currentType === 'new_house' ? '新建商品住宅' : '二手住宅';
+  document.getElementById('table-subtitle').textContent = `· ${subtitle} · ${allData.period}`;
+
+  const tbody = document.getElementById('data-table-body');
+  tbody.innerHTML = data.map(d => {
+    const hb = parseFloat(d.环比);
+    const tb = parseFloat(d.同比);
+    const hbCls = hb > 100 ? 'up' : hb < 100 ? 'down' : 'flat';
+    const tbCls = tb > 100 ? 'up' : tb < 100 ? 'down' : 'flat';
+    const cls = focused.has(d.city) ? 'class="highlight-row"' : '';
+    return `<tr ${cls}>
+      <td>${focused.has(d.city) ? '⭐ ' : ''}${d.city}</td>
+      <td class="${hbCls}">${hb.toFixed(1)}</td>
+      <td class="${tbCls}">${tb.toFixed(1)}</td>
+      <td>${parseFloat(d.定基).toFixed(1)}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ============ Switch controls ============
+function switchData(type) {
+  currentType = type;
+  document.getElementById('btn-newhouse').className = type === 'new_house' ? 'btn active' : 'btn';
+  document.getElementById('btn-secondhand').className = type === 'second_hand' ? 'btn active' : 'btn';
+  updateAll();
+}
+
+function switchMetric(metric) {
+  currentMetric = metric;
+  document.getElementById('btn-hb').className = metric === '环比' ? 'btn active' : 'btn';
+  document.getElementById('btn-tb').className = metric === '同比' ? 'btn active' : 'btn';
+  updateKeyCities();
+  renderMap();
+  renderTable();
+}
+</script>
+</body>
+</html>
