@@ -152,6 +152,7 @@ th {
 td { padding: 5px 8px; text-align: center; border-bottom: 1px solid #111e30; }
 tr:hover { background: #152545; }
 .city-focus td { color: #fbbf24; font-weight: 600; }
+.city-tag:hover { opacity: 0.9; }
 .highlight-cell { font-weight: 700; }
 
 /* ====== Tooltip ====== */
@@ -245,13 +246,15 @@ tr:hover { background: #152545; }
     </div>
     <div class="panel" id="trend-panel">
       <div class="panel-title" onmouseover="showTip(event,'<strong>累积价格指数怎么算的？</strong><br><br>🔢 <strong>公式</strong>:<br>2011年1月 = <strong>1.0</strong>（起点）<br>下个月 = 1.0 × (本月环比÷100)<br>再下个月 = 上个月结果 × (本月环比÷100)<br><br>📖 <strong>举例</strong>:<br>杭州 2011-01 = <strong>1.000</strong><br>环比 100.4 → ×1.004 = <strong>1.004</strong><br>环比 100.5 → ×1.005 = <strong>1.009</strong><br>14年后 → 累积 <strong>1.35</strong>（涨了35%）<br><br>📉 如果 <strong>小于1.0</strong> = 比2011年跌了<br>📈 如果 <strong>大于1.0</strong> = 比2011年涨了')" onmouseout="hideTip()">📈 累积价格指数 <span class="badge">起点1.0 → 每月×环比÷100</span></div>
-      <div style="padding:4px 16px 8px;font-size:12px;color:#6a8aaa;border-bottom:1px solid #1a3050;">
-        <span>🔍 城市选择：</span>
-        <label style="margin-left:8px;cursor:pointer;"><input type="checkbox" class="city-chk" value="杭州" checked onchange="onCityCheck()"> <span style="color:#fbbf24">杭州</span></label>
-        <label style="margin-left:8px;cursor:pointer;"><input type="checkbox" class="city-chk" value="大连" checked onchange="onCityCheck()"> <span style="color:#22c55e">大连</span></label>
-        <label style="margin-left:8px;cursor:pointer;"><input type="checkbox" class="city-chk" value="哈尔滨" checked onchange="onCityCheck()"> <span style="color:#ef4444">哈尔滨</span></label>
-        <label style="margin-left:8px;cursor:pointer;"><input type="checkbox" class="city-chk" value="厦门" checked onchange="onCityCheck()"> <span style="color:#3b82f6">厦门</span></label>
-        <span style="margin-left:12px;color:#4a6a8a;font-size:11px;">勾选城市 → 折线图显示</span>
+      <div style="padding:4px 12px 6px;font-size:12px;color:#6a8aaa;border-bottom:1px solid #1a3050;display:flex;align-items:center;flex-wrap:wrap;gap:4px;">
+        <span style="white-space:nowrap;">🔍 城市：</span>
+        <div id="city-tags" style="display:flex;flex-wrap:wrap;gap:3px;flex:1;"></div>
+        <div style="position:relative;">
+          <input type="text" id="city-search" placeholder="+ 输入城市名添加" 
+            style="width:130px;padding:3px 8px;border-radius:12px;border:1px solid #1a3050;background:#0f1f3d;color:#c0d0e0;font-size:11px;outline:none;"
+            oninput="onCitySearchInput()" onkeydown="onCitySearchKey(event)" onblur="setTimeout(hideCityDropdown,200)" onfocus="onCitySearchInput()">
+          <div id="city-dropdown" style="display:none;position:absolute;top:100%;left:0;right:0;max-height:200px;overflow-y:auto;background:#0f1f3d;border:1px solid #1a3050;border-radius:6px;z-index:100;margin-top:2px;"></div>
+        </div>
       </div>
       <div id="trend-container" style="width:100%;height:calc(100% - 36px);"></div>
     </div>
@@ -333,6 +336,9 @@ async function loadData() {
     document.getElementById('time-label').textContent = months[currentMonthIdx];
     
     initCharts();
+    setTimeout(function() {
+      ['杭州', '大连', '哈尔滨', '厦门'].forEach(function(c) { addCity(c); });
+    }, 300);
     updateAll();
   } catch(e) {
     document.getElementById('map-container').innerHTML = 
@@ -427,7 +433,7 @@ function renderMap() {
   const minVal = Math.min(...vals), maxVal = Math.max(...vals);
   const range = maxVal - minVal || 1;
   
-  const focusSet = new Set(FOCUS);
+  const focusSet = new Set(getSelectedCities());
   const selCities = getSelectedCities();
   
   const option = {
@@ -531,14 +537,69 @@ function computeCumulativeIndex(city) {
   return result;
 }
 
+// ========== CITY SELECTOR (Tag + Search) ==========
+const CITY_NAMES = Object.keys(CITY_COORDS).sort();
+const CITY_PALETTE = ['#fbbf24','#22c55e','#ef4444','#3b82f6','#a78bfa','#f472b6','#34d399','#f97316','#818cf8','#e879f9','#2dd4bf','#fb923c','#67e8f9','#a3e635','#facc15','#c084fc','#f87171','#38bdf8','#4ade80','#fbbf24'];
+
 function getSelectedCities() {
-  const checks = document.querySelectorAll('.city-chk:checked');
-  return Array.from(checks).map(cb => cb.value);
+  return Array.from(document.querySelectorAll('#city-tags .city-tag'))
+    .map(el => el.dataset.city);
 }
 
-function onCityCheck() {
+function addCity(city) {
+  if (!city || getSelectedCities().includes(city)) return;
+  const idx = document.querySelectorAll('#city-tags .city-tag').length;
+  const color = CITY_PALETTE[idx % CITY_PALETTE.length];
+  const tag = document.createElement('span');
+  tag.className = 'city-tag';
+  tag.dataset.city = city;
+  tag.style.cssText = 'display:inline-flex;align-items:center;gap:3px;padding:2px 6px 2px 8px;border-radius:10px;font-size:11px;background:' + color + '22;border:1px solid ' + color + '44;color:' + color + ';cursor:default;';
+  tag.innerHTML = city + '<span id="close-' + city + '" style="cursor:pointer;opacity:0.6;font-size:13px;line-height:1;">\u2715</span>';
+  document.getElementById('city-tags').appendChild(tag);
+  document.getElementById('close-' + city).onclick = function() { removeCity(city); };
   renderTrend();
   renderMap();
+  document.getElementById('city-search').value = '';
+  document.getElementById('city-dropdown').style.display = 'none';
+}
+
+function removeCity(city) {
+  const tag = document.querySelector('#city-tags .city-tag[data-city="' + city + '"]');
+  if (tag) tag.remove();
+  renderTrend();
+  renderMap();
+}
+
+function onCitySearchInput() {
+  const val = document.getElementById('city-search').value.trim();
+  const dd = document.getElementById('city-dropdown');
+  if (!val) { dd.style.display = 'none'; return; }
+  const selected = getSelectedCities();
+  const matched = CITY_NAMES.filter(function(c) { return c.includes(val) && !selected.includes(c); }).slice(0, 15);
+  if (matched.length === 0) { dd.style.display = 'none'; return; }
+  dd.innerHTML = '';
+  for (var i = 0; i < matched.length; i++) {
+    var item = document.createElement('div');
+    item.textContent = matched[i];
+    item.style.cssText = 'padding:4px 10px;cursor:pointer;color:#c0d0e0;font-size:12px;border-bottom:1px solid #1a3050;';
+    item.addEventListener('mousedown', function(e) { e.preventDefault(); addCity(this.textContent); }.bind(item));
+    item.addEventListener('mouseover', function() { this.style.background = '#1a3050'; });
+    item.addEventListener('mouseout', function() { this.style.background = ''; });
+    dd.appendChild(item);
+  }
+  dd.style.display = 'block';
+}
+
+function onCitySearchKey(e) {
+  if (e.key === 'Enter' && document.getElementById('city-dropdown').style.display !== 'none') {
+    var first = document.querySelector('#city-dropdown div');
+    if (first) addCity(first.textContent);
+  }
+  if (e.key === 'Escape') document.getElementById('city-dropdown').style.display = 'none';
+}
+
+function hideCityDropdown() {
+  document.getElementById('city-dropdown').style.display = 'none';
 }
 
 function renderTrend() {
@@ -564,10 +625,9 @@ function renderTrend() {
     };
   }).filter(Boolean);
   
-  const colors = { '杭州': '#fbbf24', '大连': '#22c55e', '哈尔滨': '#ef4444', '厦门': '#3b82f6' };
-  const colorList = ['#fbbf24', '#22c55e', '#3b82f6', '#ef4444', '#a78bfa', '#f472b6'];
+  const colorList = CITY_PALETTE;
   series.forEach((s, i) => { 
-    s.itemStyle = { color: colors[s.name] || colorList[i % colorList.length] }; 
+    s.itemStyle = { color: colorList[i % colorList.length] }; 
   });
   
   // Mark 2015 base with a dashed line
@@ -683,7 +743,7 @@ function renderRank() {
 // ========== TABLE ==========
 function renderTable() {
   const entries = getMonthData(currentType, currentMetric);
-  const focusSet = new Set(FOCUS);
+  const focusSet = new Set(getSelectedCities());
   const tbody = document.getElementById('data-body');
   tbody.innerHTML = entries.map(d => {
     const hb = d['环比'], tb = d['同比'];
