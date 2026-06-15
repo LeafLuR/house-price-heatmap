@@ -153,6 +153,8 @@ td { padding: 5px 8px; text-align: center; border-bottom: 1px solid #111e30; }
 tr:hover { background: #152545; }
 .city-focus td { color: #fbbf24; font-weight: 600; }
 .city-tag:hover { opacity: 0.9; }
+.mf-btn.active { background: #1a3050 !important; border-color: #2a5090 !important; font-weight:600; }
+.mf-btn:hover { border-color: #2a5090 !important; }
 .highlight-cell { font-weight: 700; }
 
 /* ====== Tooltip ====== */
@@ -216,15 +218,15 @@ tr:hover { background: #152545; }
 </div>
 
 <div class="kpi-row" id="kpi-row">
-  <div class="kpi-card">
-    <div class="kpi-label" onmouseover="showTip(event,'本月有多少个城市房价环比上涨')" onmouseout="hideTip()">📈 上涨城市数</div>
+  <div class="kpi-card" id="kpi-card-up" style="cursor:pointer;" onclick="toggleMapFilter('up')">
+    <div class="kpi-label" onmouseover="showTip(event,'点击切换：只显示上涨城市')" onmouseout="hideTip()">📈 上涨城市数</div>
     <div class="kpi-value up" id="kpi-up">-</div>
-    <div class="kpi-change" id="kpi-up-change">环比上涨</div>
+    <div class="kpi-change" id="kpi-up-change">点击筛选</div>
   </div>
-  <div class="kpi-card">
-    <div class="kpi-label" onmouseover="showTip(event,'本月有多少个城市房价环比下跌')" onmouseout="hideTip()">📉 下跌城市数</div>
+  <div class="kpi-card" id="kpi-card-down" style="cursor:pointer;" onclick="toggleMapFilter('down')">
+    <div class="kpi-label" onmouseover="showTip(event,'点击切换：只显示下跌城市')" onmouseout="hideTip()">📉 下跌城市数</div>
     <div class="kpi-value down" id="kpi-down">-</div>
-    <div class="kpi-change" id="kpi-down-change">环比下跌</div>
+    <div class="kpi-change" id="kpi-down-change">点击筛选</div>
   </div>
   <div class="kpi-card">
     <div class="kpi-label" onmouseover="showTip(event,'全部70城的价格变化平均值<br>&gt;100 = 整体上涨，&lt;100 = 整体下跌')" onmouseout="hideTip()">📊 70城平均</div>
@@ -242,7 +244,17 @@ tr:hover { background: #152545; }
   <div class="left-col">
     <div class="panel" id="map-panel">
       <div class="panel-title">📍 全国房价地图 <span class="badge" id="map-badge">2026年4月</span></div>
-      <div id="map-container" style="width:100%;height:calc(100% - 36px);min-height:340px;"><div class="loading-state">⏳ 加载中...</div></div>
+      <div style="padding:4px 12px;display:flex;align-items:center;gap:6px;border-bottom:1px solid #1a3050;flex-wrap:wrap;font-size:11px;">
+        <span style="color:#6a8aaa;">筛选：</span>
+        <button class="mf-btn active" id="mf-all" onclick="setMapFilter('all')" style="padding:2px 10px;border-radius:10px;border:1px solid #1a3050;background:transparent;color:#c0d0e0;cursor:pointer;">全部</button>
+        <button class="mf-btn" id="mf-up" onclick="setMapFilter('up')" style="padding:2px 10px;border-radius:10px;border:1px solid #1a3050;background:transparent;color:#ef4444;cursor:pointer;">⬆ 上涨</button>
+        <button class="mf-btn" id="mf-down" onclick="setMapFilter('down')" style="padding:2px 10px;border-radius:10px;border:1px solid #1a3050;background:transparent;color:#22c55e;cursor:pointer;">⬇ 下跌</button>
+        <span style="flex:1;"></span>
+        <button onclick="resetMapView()" style="padding:2px 8px;border-radius:10px;border:1px solid #1a3050;background:transparent;color:#6a8aaa;cursor:pointer;" title="重置缩放">⟲</button>
+        <button onclick="zoomMapBy(0.7)" style="padding:2px 8px;border-radius:10px;border:1px solid #1a3050;background:transparent;color:#6a8aaa;cursor:pointer;font-size:14px;" title="缩小">−</button>
+        <button onclick="zoomMapBy(1.3)" style="padding:2px 8px;border-radius:10px;border:1px solid #1a3050;background:transparent;color:#6a8aaa;cursor:pointer;font-size:14px;" title="放大">+</button>
+      </div>
+      <div id="map-container" style="width:100%;height:calc(100% - 72px);min-height:340px;"><div class="loading-state">⏳ 加载中...</div></div>
     </div>
     <div class="panel" id="trend-panel">
       <div class="panel-title" onmouseover="showTip(event,'<strong>累积价格指数怎么算的？</strong><br><br>🔢 <strong>公式</strong>:<br>2011年1月 = <strong>1.0</strong>（起点）<br>下个月 = 1.0 × (本月环比÷100)<br>再下个月 = 上个月结果 × (本月环比÷100)<br><br>📖 <strong>举例</strong>:<br>杭州 2011-01 = <strong>1.000</strong><br>环比 100.4 → ×1.004 = <strong>1.004</strong><br>环比 100.5 → ×1.005 = <strong>1.009</strong><br>14年后 → 累积 <strong>1.35</strong>（涨了35%）<br><br>📉 如果 <strong>小于1.0</strong> = 比2011年跌了<br>📈 如果 <strong>大于1.0</strong> = 比2011年涨了')" onmouseout="hideTip()">📈 累积价格指数 <span class="badge">起点1.0 → 每月×环比÷100</span></div>
@@ -409,8 +421,38 @@ function updateAll() {
   updateKPI();
 }
 
-// ========== PROVINCE MAP ==========
-// Map city → province (matches DataV GeoJSON names)
+// ========== CITY MAP (省份底色 + 城市色块) ==========
+let mapFilter = 'all';
+
+function setMapFilter(mode) {
+  mapFilter = mode;
+  document.querySelectorAll('.mf-btn').forEach(function(b) {
+    b.classList.remove('active');
+    b.style.background = 'transparent';
+  });
+  var btn = document.getElementById('mf-' + mode);
+  if (btn) { btn.classList.add('active'); btn.style.background = '#1a3050'; }
+  renderMap();
+}
+
+function toggleMapFilter(mode) {
+  if (mapFilter === mode) setMapFilter('all');
+  else setMapFilter(mode);
+}
+
+function resetMapView() {
+  if (mapChart) mapChart.dispatchAction({ type: 'restore' });
+}
+
+function zoomMapBy(scale) {
+  if (!mapChart) return;
+  try {
+    var opt = mapChart.getOption();
+    var cur = (opt && opt.series && opt.series[0] && opt.series[0].zoom) ? opt.series[0].zoom : 1;
+    mapChart.dispatchAction({ type: 'geoZoom', zoom: cur * scale });
+  } catch(e) {}
+}
+
 const PROVINCE_MAP = {
   '北京':'北京市','天津':'天津市','上海':'上海市','重庆':'重庆市',
   '石家庄':'河北省','唐山':'河北省','秦皇岛':'河北省',
@@ -438,7 +480,7 @@ const PROVINCE_MAP = {
 };
 
 function colorFor(val) {
-  const d = val - 100;
+  var d = val - 100;
   if (d >= 2) return '#dc2626';
   if (d >= 1) return '#ef4444';
   if (d >= 0.3) return '#fca5a5';
@@ -449,83 +491,111 @@ function colorFor(val) {
 }
 
 function renderMap() {
-  const entries = getMonthData(currentType, currentMetric);
+  var entries = getMonthData(currentType, currentMetric);
   
-  // Aggregate by province: average of all cities in that province
-  const provData = {};
-  const provCities = {};
-  for (const e of entries) {
-    const prov = PROVINCE_MAP[e.city];
-    if (!prov) continue;
-    if (!provData[prov]) { provData[prov] = 0; provCities[prov] = 0; }
-    provData[prov] += e.metric;
-    provCities[prov]++;
+  // Apply filter
+  if (mapFilter === 'up') {
+    entries = entries.filter(function(e) { return e.metric > 100; });
+  } else if (mapFilter === 'down') {
+    entries = entries.filter(function(e) { return e.metric < 100; });
   }
   
-  // Build map series data
-  const mapData = Object.keys(provData).map(prov => ({
-    name: prov,
-    value: +(provData[prov] / provCities[prov]).toFixed(1),
-    itemStyle: { color: colorFor(provData[prov] / provCities[prov]) }
-  }));
-  
-  const focusSet = new Set(getSelectedCities());
-  
-  // Find which provinces have focus cities
-  const focusProvinces = new Set();
-  for (const city of focusSet) {
-    const p = PROVINCE_MAP[city];
-    if (p) focusProvinces.add(p);
+  // Province average
+  var provSum = {}, provCnt = {};
+  for (var i = 0; i < entries.length; i++) {
+    var e = entries[i];
+    var p = PROVINCE_MAP[e.city];
+    if (!p) continue;
+    if (!provSum[p]) { provSum[p] = 0; provCnt[p] = 0; }
+    provSum[p] += e.metric;
+    provCnt[p]++;
   }
   
-  const option = {
+  var mapData = [];
+  for (var p in provSum) {
+    mapData.push({ name: p, value: +(provSum[p] / provCnt[p]).toFixed(1), itemStyle: { color: colorFor(provSum[p] / provCnt[p]) } });
+  }
+  
+  // City scatter
+  var scatter = [];
+  for (var i = 0; i < entries.length; i++) {
+    var d = entries[i];
+    var coord = CITY_COORDS[d.city];
+    if (!coord) continue;
+    scatter.push({ name: d.city, value: [coord[0], coord[1], d.metric] });
+  }
+  
+  var focusSet = new Set(getSelectedCities());
+  var hasFocus = focusSet.size > 0;
+  
+  var option = {
     backgroundColor: 'transparent',
     tooltip: {
       trigger: 'item',
-      formatter: p => {
-        if (!p.data) return p.name;
-        const val = p.data.value;
-        const cities = entries.filter(e => PROVINCE_MAP[e.city] === p.name).map(e => e.city).join('、');
-        const arrow = val > 100 ? '↑' : val < 100 ? '↓' : '→';
-        return `<strong>${p.name}</strong><br/>
-          <span style="font-size:24px;font-weight:700;color:${colorFor(val)}">${arrow} ${(val-100).toFixed(1)}%</span><br/>
-          <span style="color:#5a7a9a;font-size:11px">含 ${cities}</span>`;
+      formatter: function(p) {
+        if (p.seriesIndex === 0) {
+          if (!p.data) return p.name;
+          var val = p.data.value;
+          var cities = [];
+          for (var i = 0; i < entries.length; i++) {
+            if (PROVINCE_MAP[entries[i].city] === p.name) cities.push(entries[i].city);
+          }
+          return '<strong>' + p.name + '</strong><br/><span style="font-size:22px;font-weight:700;color:' + colorFor(val) + '">' + (val > 100 ? '↑' : val < 100 ? '↓' : '→') + ' ' + (val-100).toFixed(1) + '%</span><br/><span style="color:#5a7a9a;font-size:11px">含 ' + cities.join('、') + '</span>';
+        } else {
+          var entry = null;
+          for (var i = 0; i < entries.length; i++) { if (entries[i].city === p.name) { entry = entries[i]; break; } }
+          if (!entry) return p.name;
+          var hb = entry['环比'], tb = entry['同比'];
+          return '<strong>' + p.name + '</strong><br/><span style="font-size:18px;font-weight:700;color:' + colorFor(hb) + '">' + (hb > 100 ? '↑ +' : hb < 100 ? '↓ ' : '→ ') + (hb-100).toFixed(1) + '%</span><br/><span style="color:#5a7a9a;font-size:11px">同比: ' + (tb > 100 ? '↑ +' : tb < 100 ? '↓ ' : '→ ') + (tb-100).toFixed(1) + '%</span>';
+        }
       },
       backgroundColor: 'rgba(10,14,23,0.9)', borderColor: '#1a3050',
       textStyle: { color: '#e1e8ed', fontSize: 12 }
     },
-    visualMap: {
-      show: false,
-      min: 95, max: 105,
-      inRange: { color: ['#16a34a','#86efac','#6b7280','#fca5a5','#dc2626'] }
-    },
     series: [{
-      name: '房价指数',
-      type: 'map',
-      map: 'china',
-      roam: true,
-      label: { show: true, color: '#e1e8ed', fontSize: 10 },
-      itemStyle: { areaColor: '#1a2a3c', borderColor: '#2a4a6c', borderWidth: 0.5 },
-      emphasis: {
-        label: { fontSize: 13, fontWeight: 'bold' },
-        itemStyle: { areaColor: '#2a4a7c' }
-      },
-      data: mapData
-    }, {
-      name: '关注省份',
-      type: 'map',
-      map: 'china',
-      roam: true,
-      z: 2,
-      selectedMode: false,
+      name: '省份',
+      type: 'map', map: 'china',
+      roam: true, zoom: 1.2,
       label: { show: false },
-      itemStyle: { areaColor: 'rgba(0,0,0,0)', borderColor: '#fbbf24', borderWidth: 2 },
-      data: mapData.filter(d => focusProvinces.has(d.name)).map(d => ({
-        ...d,
-        itemStyle: { areaColor: 'rgba(0,0,0,0)', borderColor: '#fbbf24', borderWidth: 2.5, shadowBlur: 8, shadowColor: '#fbbf2444' }
-      }))
+      itemStyle: { areaColor: '#1a2a3c', borderColor: '#2a4a6c', borderWidth: 0.5 },
+      emphasis: { label: { show: false } },
+      data: mapData,
+      z: 0
+    }, {
+      name: '城市',
+      type: 'scatter',
+      coordinateSystem: 'geo',
+      data: scatter.map(function(d) {
+        var isFocus = hasFocus && focusSet.has(d.name);
+        return {
+          name: d.name, value: d.value,
+          symbolSize: isFocus ? 22 : 16,
+          itemStyle: { color: colorFor(d.value[2]), borderColor: isFocus ? '#fbbf24' : '#0a0e17', borderWidth: isFocus ? 3 : 2 },
+          label: { show: true, formatter: d.name, position: 'right', color: isFocus ? '#fbbf24' : '#c0d0e0', fontSize: isFocus ? 11 : 9, fontWeight: isFocus ? 'bold' : 'normal' }
+        };
+      }),
+      z: 3
     }]
   };
+  
+  // Focus pulse layer
+  if (hasFocus) {
+    var fs = [];
+    for (var i = 0; i < scatter.length; i++) {
+      if (focusSet.has(scatter[i].name)) {
+        fs.push({ name: scatter[i].name, value: scatter[i].value, symbolSize: 24, itemStyle: { color: colorFor(scatter[i].value[2]), borderColor: '#fbbf24', borderWidth: 3 } });
+      }
+    }
+    if (fs.length > 0) {
+      option.series.push({
+        name: '关注',
+        type: 'effectScatter', coordinateSystem: 'geo',
+        data: fs,
+        rippleEffect: { brushType: 'stroke', period: 4, scale: 2.5 },
+        z: 4
+      });
+    }
+  }
   
   mapChart.setOption(option, true);
 }
