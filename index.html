@@ -126,8 +126,8 @@ a:hover { text-decoration: underline; }
 
 #map-panel { flex: 1; min-height: 380px; }
 #trend-panel { height: 300px; }
-#rank-panel { height: 300px; }
-#table-panel { flex: 1; min-height: 280px; }
+#rank-panel { min-height: 340px; height: 340px; }
+#table-panel { flex: 1; min-height: 260px; }
 
 /* ====== Focus Cities ====== */
 .focus-grid {
@@ -609,7 +609,7 @@ function renderRank() {
       backgroundColor: 'rgba(10,14,23,0.9)', borderColor: '#1a3050',
       textStyle: { color: '#e1e8ed', fontSize: 12 }
     },
-    grid: { left: 15, right: 55, top: 5, bottom: 5 },
+    grid: { left: 15, right: 65, top: 10, bottom: 10 },
     xAxis: {
       type: 'value',
       axisLabel: { formatter: v => v + '%', color: '#4a6a8a', fontSize: 9 },
@@ -625,8 +625,8 @@ function renderRank() {
     series: [{
       type: 'bar',
       data: vals.map((v, i) => ({ value: v, itemStyle: { color: colors[i], borderRadius: [0, 4, 4, 0] } })),
-      barWidth: 14,
-      label: { show: true, position: 'right', formatter: p => p.value > 0 ? '+' + p.value + '%' : p.value + '%', color: '#c0d0e0', fontSize: 10 }
+      barWidth: 12,
+      label: { show: true, position: 'right', formatter: p => (p.value > 0 ? '+' : '') + p.value + '%', color: '#c0d0e0', fontSize: 10, width: 60, overflow: 'truncate' }
     }]
   };
   
